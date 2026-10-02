@@ -169,6 +169,37 @@ with tab2:
                 st.success(f"Rank {rank} [{item['id']}] (Dist: {item['true_dist']:.4f})\n\nText: {item['text']}")
 
 # Tab 3: Local LLM generation
+# Tab 3: Local LLM generation
 with tab3:
     if "last_retrieved" in st.session_state and st.session_state.last_retrieved:
-        context_str = "\n".join([f"- [{doc['id']}]: {doc['
+        # Build context string from retrieved docs
+        context_str = "\n".join([f"- [{doc['id']}]: {doc['text']}" for doc in st.session_state.last_retrieved])
+        st.subheader("Retrieved Context")
+        st.text_area("Context for LLM", context_str, height=200)
+
+        if st.button("Send Prompt to Local Ollama"):
+            payload = {
+                "model": model_name,
+                "prompt": f"User Query: {st.session_state.last_query}\n\nContext:\n{context_str}"
+            }
+            try:
+                req = urllib.request.Request(
+                    ollama_url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}
+                )
+                with urllib.request.urlopen(req) as resp:
+                    responses = []
+                    for line in resp:
+                        try:
+                            obj = json.loads(line.decode("utf-8"))
+                            if "response" in obj:
+                                responses.append(obj["response"])
+                        except json.JSONDecodeError:
+                            continue
+                    final_answer = "".join(responses)
+                    st.success(f"Ollama Response:\n\n{final_answer}")
+            except Exception as e:
+                st.error(f"Error contacting Ollama: {e}")
+    else:
+        st.info("Run a secure search first to populate context.")
